@@ -1,22 +1,27 @@
 // In-memory demo calendar. Seeded relative to the current week so it always looks live.
 import { randomUUID } from 'node:crypto';
 
-function at(dayOffset, h, m = 0) {
-  const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(h, m, 0, 0); return d.toISOString();
+// Offsets (in calendar days from `now`) of the next three weekdays, starting today when today is a weekday.
+// Keeps every demo event on a working day, so the sample never spills onto a weekend.
+export function weekdayOffsets(now = new Date()) {
+  const out = []; const d = new Date(now);
+  for (let i = 0; out.length < 3; i++) {
+    const w = new Date(now); w.setDate(d.getDate() + i);
+    if (w.getDay() !== 0 && w.getDay() !== 6) out.push(i);
+  }
+  return out;
 }
-function mondayOffset() { const d = new Date().getDay(); return d === 0 ? -6 : 1 - d; }
 
-export function seed() {
-  // Use today as anchor for the demo so "now" filtering in the rerouter has room to work.
-  const today = new Date().getDay();
-  const day = (today === 0 || today === 6) ? mondayOffset() + 7 : 0;
+export function seed(now = new Date()) {
+  const days = weekdayOffsets(now);
+  const at = (dayOffset, h, m = 0) => { const d = new Date(now); d.setDate(d.getDate() + dayOffset); d.setHours(h, m, 0, 0); return d.toISOString(); };
   const mk = (title, off, h1, m1, h2, m2, kind, flexible, extra = {}) =>
-    ({ id: randomUUID(), title, start: at(day + off, h1, m1), end: at(day + off, h2, m2), kind, flexible, ...extra });
-  const extra = process.env.DEMO_ALLDAY ? [{ id: randomUUID(), title: 'Company holiday', kind: 'meeting', flexible: false, allDay: true, start: new Date(new Date(at(day + 2, 0)).setHours(0,0,0,0)).toISOString(), end: new Date(new Date(at(day + 3, 0)).setHours(0,0,0,0)).toISOString() }] : [];
+    ({ id: randomUUID(), title, start: at(days[off], h1, m1), end: at(days[off], h2, m2), kind, flexible, ...extra });
+  const extra = process.env.DEMO_ALLDAY ? [{ id: randomUUID(), title: 'Company holiday', kind: 'meeting', flexible: false, allDay: true, start: new Date(new Date(at(days[2], 0)).setHours(0,0,0,0)).toISOString(), end: new Date(new Date(at(days[2] + 1, 0)).setHours(0,0,0,0)).toISOString() }] : [];
   return [
     ...extra,
     mk('Team standup', 0, 9, 30, 10, 0, 'meeting', false, { attendees: 6 }),
-    mk('Write proposal', 0, 11, 0, 13, 0, 'personal', true),
+    mk('Write proposal', 0, 11, 0, 12, 30, 'personal', true),
     mk('Lunch', 0, 13, 0, 14, 0, 'personal', false),
     mk('Admin and email', 0, 15, 30, 16, 30, 'personal', true),
     mk('Design review', 1, 10, 0, 11, 30, 'meeting', false, { attendees: 4 }),
