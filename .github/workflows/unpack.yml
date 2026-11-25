@@ -1,7 +1,7 @@
 name: unpack
 on:
   push:
-    paths: ['code.zip']
+    paths: ['bundle.json']
   workflow_dispatch:
 permissions:
   contents: write
@@ -10,4 +10,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: 'test -f code.zip && unzip -o code.zip && rm code.zip && git config user.name "Somu Kandula" && git config user.email somukandula99@gmail.com && git add -A && git commit -m "Add Reroute my day source" && git push'
+      - run: 'test -f bundle.json && python3 -c "import json,os;d=json.load(open(\"bundle.json\"));[(os.makedirs(os.path.dirname(p) or \".\",exist_ok=True),open(p,\"w\").write(c)) for p,c in d.items()]" && rm bundle.json && git config user.name "Somu Kandula" && git config user.email somukandula99@gmail.com && git add -A && git commit -m "Add Reroute my day source" && git push'
