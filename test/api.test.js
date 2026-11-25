@@ -205,8 +205,27 @@ test('AI explanation that names no moved block, or contains numbers, is dropped 
 
 test('AI: falls through the model list when the first model fails', async () => {
   const seen = [];
-  const f = async (u, o) => { const m = JSON.parse(o.body).model; seen.push(m); return m === 'a' ? { ok: false, status: 429, json: async () => ({}) } : { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '{"earliestHour":10,"latestHour":16}' } }] }) }; };
-  const ai = createAi({ AI_API_KEY: 'k', AI_MODEL: 'a,b' }, f);
+  const f = async (u, o) => { const m = JSON.parse(o.body).model; seen.push(m); return m === 'a:free' ? { ok: false, status: 429, json: async () => ({}) } : { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '{"earliestHour":10,"latestHour":16}' } }] }) }; };
+  const ai = createAi({ AI_API_KEY: 'k', AI_MODEL: 'a:free,b:free' }, f);
   assert.deepEqual(await ai.parsePrefs('x'), { earliestHour: 10, latestHour: 16 });
-  assert.deepEqual(seen, ['a', 'b']);
+  assert.deepEqual(seen, ['a:free', 'b:free']);
+});
+
+test('healthz works without a session; Secure cookie when behind an https proxy', async () => {
+  const base = await start({ ai: createAi({}) });
+  assert.equal((await fetch(base + '/healthz')).status, 200);
+  const r = await fetch(base + '/api/mode', { headers: { 'x-forwarded-proto': 'https' } });
+  assert.match(r.headers.get('set-cookie'), /Secure/);
+});
+test('AI endpoints are rate limited per session', async () => {
+  const ai = createAi({ AI_API_KEY: 'k' }, fakeFetch({ earliestHour: 9, latestHour: 17 }));
+  const c = await client(await start({ ai }));
+  let last;
+  for (let i = 0; i < 32; i++) last = await c.post('/api/ai/prefs', { text: 'mornings' });
+  assert.equal(last.status, 429);
+});
+
+test('AI: non-free models are dropped unless ALLOW_PAID_MODELS=1', () => {
+  assert.equal(createAi({ AI_API_KEY: 'k', AI_MODEL: 'openai/gpt-4o,x:free' }).model, 'x:free');
+  assert.equal(createAi({ AI_API_KEY: 'k', AI_MODEL: 'openai/gpt-4o', ALLOW_PAID_MODELS: '1' }).model, 'openai/gpt-4o');
 });
