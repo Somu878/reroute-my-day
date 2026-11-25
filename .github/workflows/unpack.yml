@@ -1,0 +1,13 @@
+name: unpack
+on:
+  push:
+    paths: ['code.zip']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: 'test -f code.zip && unzip -o code.zip && rm code.zip && git config user.name "Somu Kandula" && git config user.email somukandula99@gmail.com && git add -A && git commit -m "Add Reroute my day source" && git push'
