@@ -1,0 +1,27 @@
+# Render Blueprint. Free plan, no card needed. Demo mode works with no secrets.
+services:
+  - type: web
+    name: reroute-my-day
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: TZ
+        value: Asia/Kolkata
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: AI_API_KEY      # optional: your OpenRouter key; empty = rules-only mode
+        sync: false
+      - key: OWNER_EMAIL     # optional: only this Google account may connect live Calendar
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI   # https://<service>.onrender.com/auth/callback
+        sync: false
