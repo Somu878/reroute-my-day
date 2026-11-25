@@ -2,7 +2,7 @@
 // It can only (1) turn free text into a validated preference object, and
 // (2) pick among slots the rules engine already proved feasible, and explain the result.
 // Event titles are untrusted data and are passed as JSON values, never as instructions.
-// Works with any OpenAI-compatible /chat/completions endpoint. Live provider is UNVERIFIED here (tests use a mock).
+// Works with OpenRouter (default) or any OpenAI-compatible /chat/completions endpoint. Tested live against OpenRouter free models; unit tests use a mock provider.
 
 export function createAi(env = process.env, fetchImpl = globalThis.fetch) {
   const enabled = !!env.AI_API_KEY;
