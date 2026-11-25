@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reroute my day</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header>
+  <div class="brand"><span class="logo">↻</span> Reroute my day</div>
+  <div class="spacer"></div>
+  <span id="ai" class="pill"></span>
+  <span id="mode" class="pill"></span>
+  <button id="connect" class="ghost">Connect Google Calendar</button>
+  <div id="demoTools">
+    <button id="disrupt" class="ghost">Simulate: urgent meeting lands</button>
+    <button id="reset" class="ghost">Reset demo</button>
+  </div>
+</header>
+<main>
+  <section id="cal"><div id="grid"></div></section>
+  <aside>
+    <div id="banner"></div>
+    <div id="prefs" style="display:none"><input id="prefsText" placeholder="Tell it your preference, e.g. keep focus work in the morning"><button id="prefsGo" class="ghost">Set</button></div>
+    <div id="proposal"></div>
+    <div class="legend">
+      <h4>How it works</h4>
+      <p><span class="sw meeting"></span> Meetings with other people never move.</p>
+      <p><span class="sw flex"></span> Personal blocks marked flexible (click ⇄ on a block) can be rerouted.</p>
+      <p><span class="sw ghost"></span> Dashed blocks show the proposed new plan. Nothing changes until you press Apply.</p>
+    </div>
+  </aside>
+</main>
+<div id="toast" hidden></div>
+<script src="app.js" type="module"></script>
+</body></html>

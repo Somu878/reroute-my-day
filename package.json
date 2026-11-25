@@ -1,0 +1,11 @@
+{
+  "name": "reroute-my-day",
+  "version": "0.1.0",
+  "description": "Calendar that reroutes your day when the plan breaks. Zero runtime dependencies.",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=20" }
+}
