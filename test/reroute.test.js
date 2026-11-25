@@ -97,3 +97,25 @@ test('validateMoves rejects out-of-hours, weekend and past targets', () => {
   assert.ok(validateMoves(evs, [{ eventId: 'p', to: { start: new Date(2030, 0, 5, 10).toISOString(), end: new Date(2030, 0, 5, 11).toISOString() } }]).length);
   assert.ok(validateMoves(evs, [{ eventId: 'p', to: { start: new Date(2001, 0, 2, 10).toISOString(), end: new Date(2001, 0, 2, 11).toISOString() } }]).length);
 });
+
+test('demo seed never places an event on a weekend, whatever day it is opened', async () => {
+  const { seed } = await import('../server/demo.js');
+  for (let i = 0; i < 14; i++) {
+    const now = new Date(2026, 10, 23 + i, 10, 0, 0); // starts Mon 23 Nov 2026, covers two weeks
+    const evs = seed(now);
+    for (const e of evs) { const w = new Date(e.start).getDay(); assert.ok(w !== 0 && w !== 6, `${now.toDateString()}: "${e.title}" lands on a weekend`); }
+    assert.equal(evs.filter((e) => e.flexible).length, 4);
+  }
+});
+
+test('search window counts working days, so a Thursday block can land on Monday', async () => {
+  const { findSlots } = await import('../server/reroute.js');
+  const blk = { id: 'b', start: D(11, 0, 3), end: D(13, 0, 3), kind: 'personal', flexible: true }; // Thu Jan 3 2030
+  const busy = [
+    { id: 'm1', start: D(9, 0, 3), end: D(18, 0, 3), kind: 'meeting' },
+    { id: 'm2', start: D(9, 0, 4), end: D(18, 0, 4), kind: 'meeting' },
+  ];
+  const slots = findSlots(blk, busy, { now: 0, searchDays: 3 });
+  assert.ok(slots.length >= 1);
+  assert.equal(new Date(slots[0].start).getDay(), 1); // Monday, Fri full, weekend skipped
+});
