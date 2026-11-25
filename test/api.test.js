@@ -229,3 +229,31 @@ test('AI: non-free models are dropped unless ALLOW_PAID_MODELS=1', () => {
   assert.equal(createAi({ AI_API_KEY: 'k', AI_MODEL: 'openai/gpt-4o,x:free' }).model, 'x:free');
   assert.equal(createAi({ AI_API_KEY: 'k', AI_MODEL: 'openai/gpt-4o', ALLOW_PAID_MODELS: '1' }).model, 'openai/gpt-4o');
 });
+
+test('undo skips a block whose end time was edited after apply, even if the start is unchanged', async () => {
+  const store = new DemoStore();
+  const c = await client(await start({ ai: createAi({}), storeFactory: () => store }));
+  await armFlexible(c); await c.post('/api/demo/disrupt');
+  const plan = (await c.get('/api/reroute/plan')).body;
+  await c.post('/api/reroute/apply', { moves: plan.moves, planHash: plan.planHash });
+  const m = plan.moves[0];
+  const ev = store.events.find((e) => e.id === m.eventId);
+  const editedEnd = new Date(new Date(m.to.end).getTime() + 30 * 60000).toISOString();
+  ev.end = editedEnd; // user shortens/extends the block but leaves the start alone
+  const undo = await c.post('/api/reroute/undo');
+  assert.equal(undo.body.undone, 0); assert.deepEqual(undo.body.skipped, [m.title]);
+  assert.equal(store.events.find((e) => e.id === m.eventId).end, editedEnd); // the user's edit survives
+});
+test('undo still restores a block that is untouched, and treats the same instant in another offset as unchanged', async () => {
+  const store = new DemoStore();
+  const c = await client(await start({ ai: createAi({}), storeFactory: () => store }));
+  await armFlexible(c); await c.post('/api/demo/disrupt');
+  const plan = (await c.get('/api/reroute/plan')).body;
+  await c.post('/api/reroute/apply', { moves: plan.moves, planHash: plan.planHash });
+  const m = plan.moves[0];
+  const ev = store.events.find((e) => e.id === m.eventId);
+  const off = (iso) => { const d = new Date(new Date(iso).getTime() + 5 * 3600000); const p = (n) => String(n).padStart(2, '0'); return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:00+05:00`; };
+  ev.start = off(m.to.start); ev.end = off(m.to.end); // same instants, written with a +05:00 offset like Google does
+  const undo = await c.post('/api/reroute/undo');
+  assert.equal(undo.body.undone, 1); assert.deepEqual(undo.body.skipped, []);
+});
