@@ -174,8 +174,8 @@ export function createServer({ ai = createAi(), storeFactory } = {}) {
           const restored = [], skipped = [];
           for (const b of batch) {
             const now = cur.find((e) => e.id === b.eventId);
-            // Only undo if the event is still where we put it. Never overwrite later edits.
-            if (!now || new Date(now.start).getTime() !== new Date(b.to.start).getTime()) { skipped.push(b.title); continue; }
+            // Only undo if the event is still exactly where we put it (start AND end, compared as instants). Never overwrite later edits.
+            if (!now || new Date(now.start).getTime() !== new Date(b.to.start).getTime() || new Date(now.end).getTime() !== new Date(b.to.end).getTime()) { skipped.push(b.title); continue; }
             try { await store.move(b.eventId, b.start, b.end); restored.push(b.title); } catch { skipped.push(b.title); }
           }
           return json(res, 200, { undone: restored.length, skipped });
