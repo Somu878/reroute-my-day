@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN = 'https://oauth2.googleapis.com/token';
 const API = 'https://www.googleapis.com/calendar/v3';
-const SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const SCOPE = 'https://www.googleapis.com/auth/calendar.events openid email'; // openid+email only to verify the owner gate
 
 export const googleConfigured = () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 
@@ -96,3 +96,9 @@ export function mapGoogleEvent(e) {
 }
 
 export const newState = () => crypto.randomBytes(16).toString('hex');
+
+export async function accountEmail(accessToken) {
+  const r = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { authorization: `Bearer ${accessToken}` } });
+  const j = await r.json().catch(() => ({}));
+  return r.ok && j.email_verified ? String(j.email).toLowerCase() : '';
+}
