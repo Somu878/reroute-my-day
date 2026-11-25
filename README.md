@@ -6,7 +6,7 @@ Google Maps reroutes you when traffic changes. Calendar does nothing when your d
 
     cp .env.example .env     # optional for demo mode
     npm start                # http://localhost:3000
-    npm test                 # 37 tests
+    npm test                 # 44 tests
 
 Demo mode needs nothing. Click "Simulate: urgent meeting lands" to break the plan, review the proposal, press Apply, then Undo.
 
