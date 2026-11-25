@@ -46,9 +46,11 @@ export function findSlots(block, busy, opts = {}, n = 3) {
   const origin = t(block.start);
   const base = new Date(origin); base.setHours(0, 0, 0, 0);
   const cands = [];
-  for (let d = 0; d <= (prefs.sameDayOnly ? 0 : searchDays); d++) {
-    const day = new Date(base); day.setDate(day.getDate() + d);
+  // searchDays counts working days after the block's own day (weekends are skipped, not counted).
+  for (let cal = 0, d = 0; d <= (prefs.sameDayOnly ? 0 : searchDays) && cal < 30; cal++) {
+    const day = new Date(base); day.setDate(day.getDate() + cal);
     if (day.getDay() === 0 || day.getDay() === 6) continue;
+    const dd = d++;
     const [ws, we] = dayWindows(day, ws0, we0);
     for (let s = ws; s + dur <= we; s += step) {
       if (s < now) continue;
@@ -56,7 +58,7 @@ export function findSlots(block, busy, opts = {}, n = 3) {
       if (busy.some((b) => t(b.start) - buf < e && s < t(b.end) + buf)) continue;
       const hr = new Date(s).getHours();
       const partMiss = prefs.preferPart && ((prefs.preferPart === 'morning') !== (hr < 12)) ? 120 : 0;
-      cands.push({ s, score: d * 100000 + Math.abs(s - origin) / MIN + partMiss, d });
+      cands.push({ s, score: dd * 100000 + Math.abs(s - origin) / MIN + partMiss, d: dd });
     }
   }
   cands.sort((x, y) => x.score - y.score || x.s - y.s);
