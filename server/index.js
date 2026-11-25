@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { proposeReroute, validateMoves } from './reroute.js';
 import { DemoStore } from './demo.js';
 import { createAi } from './ai.js';
-import { googleConfigured, authUrl, exchangeCode, GoogleStore, newState } from './google.js';
+import { googleConfigured, authUrl, exchangeCode, GoogleStore, newState, accountEmail } from './google.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -28,14 +28,23 @@ const sign = (sid) => crypto.createHmac('sha256', SECRET).update(sid).digest('he
 const TTL = 8 * 3600 * 1000, MAX_SESSIONS = 1000;
 const sessions = new Map();
 
-function newSession(res) {
+// Tiny fixed-window limiter. Keeps a public demo from burning the AI key or flooding sessions.
+const hits = new Map();
+export function allow(key, max, windowMs) {
+  const now = Date.now(); const h = hits.get(key);
+  if (!h || now - h.t > windowMs) { hits.set(key, { t: now, n: 1 }); if (hits.size > 5000) hits.delete(hits.keys().next().value); return true; }
+  return ++h.n <= max;
+}
+const clientIp = (req) => (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+
+function newSession(res, req) {
   const now = Date.now();
   for (const [k, v] of sessions) if (now - v.last > TTL) sessions.delete(k);
   if (sessions.size >= MAX_SESSIONS) sessions.delete(sessions.keys().next().value);
   const sid = crypto.randomBytes(16).toString('hex');
   const s = { sid, last: now, csrf: crypto.randomBytes(16).toString('hex'), undo: [], lock: Promise.resolve(), aiCache: new Map() };
   sessions.set(sid, s);
-  const secure = /^https:/.test(process.env.GOOGLE_REDIRECT_URI || '') ? '; Secure' : '';
+  const secure = (/^https:/.test(process.env.GOOGLE_REDIRECT_URI || '') || req?.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
   res.setHeader('set-cookie', `sid=${sid}.${sign(sid)}; HttpOnly; SameSite=Lax; Path=/${secure}`);
   return s;
 }
@@ -46,7 +55,7 @@ function getSession(req, res) {
     const s = ok && sessions.get(m[1]);
     if (s && Date.now() - s.last < TTL) { s.last = Date.now(); return s; }
   }
-  return newSession(res);
+  return newSession(res, req);
 }
 
 // Everything a session touches is its own: demo calendar, undo stack, Google tokens, prefs.
@@ -75,7 +84,8 @@ export function createServer({ ai = createAi(), storeFactory } = {}) {
     const key = hash + JSON.stringify(sess.prefs || {});
     let r = sess.aiCache.get(key);
     if (!r || (r.error && Date.now() - r.at > 30000)) {
-      try { r = { ...(await ai.rank(plan, sess.prefsText)), at: Date.now() }; } catch (e) { r = { error: e.message, at: Date.now() }; }
+      if (!allow(`ai:${sess.sid}`, 30, 3600000) || !allow('ai:global', 300, 3600000)) r = { error: 'AI rate limit', at: Date.now() };
+      else try { r = { ...(await ai.rank(plan, sess.prefsText)), at: Date.now() }; } catch (e) { r = { error: e.message, at: Date.now() }; }
       sess.aiCache.set(key, r);
     }
     if (r.error) { out.ai.status = 'error'; out.ai.error = 'AI unavailable, showing the rules-only plan.'; return out; }
@@ -87,6 +97,7 @@ export function createServer({ ai = createAi(), storeFactory } = {}) {
 
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
+    if (url.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('ok'); }
     const sess = getSession(req, res);
     try {
       if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -106,9 +117,13 @@ export function createServer({ ai = createAi(), storeFactory } = {}) {
         if (!want || got.length !== want.length || !crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want))) return json(res, 400, { error: 'Bad OAuth state' });
         if (url.searchParams.get('error') || !url.searchParams.get('code')) return json(res, 400, { error: 'Google sign-in was cancelled or failed' });
         const t = await exchangeCode(url.searchParams.get('code'));
+        // Optional owner gate: on a shared host only OWNER_EMAIL's calendar may connect.
+        if (process.env.OWNER_EMAIL) {
+          if ((await accountEmail(t.access_token)) !== process.env.OWNER_EMAIL.trim().toLowerCase()) { sessions.delete(sess.sid); return json(res, 403, { error: 'This deployment only accepts its owner\'s Google account.' }); }
+        }
         // Rotate session id and CSRF token on login (prevents session fixation).
         sessions.delete(sess.sid);
-        const fresh = newSession(res);
+        const fresh = newSession(res, req);
         fresh.google = { access_token: t.access_token, refresh_token: t.refresh_token, expires_at: Date.now() + t.expires_in * 1000 };
         res.writeHead(302, { location: '/' }); return res.end();
       }
@@ -120,6 +135,7 @@ export function createServer({ ai = createAi(), storeFactory } = {}) {
       if (url.pathname === '/api/ai/prefs' && req.method === 'POST') {
         if (!ai.enabled) return json(res, 400, { error: 'AI is not configured (no AI_API_KEY). Rules-only mode.' });
         const { text = '' } = await body(req);
+        if (!allow(`ai:${sess.sid}`, 30, 3600000) || !allow('ai:global', 300, 3600000)) return json(res, 429, { error: 'AI rate limit reached. Try again later.' });
         if (!String(text).trim()) { sess.prefs = {}; sess.prefsText = null; return json(res, 200, { prefs: {} }); }
         try { sess.prefs = await ai.parsePrefs(text); sess.prefsText = String(text).slice(0, 500); } catch (e) { return json(res, 502, { error: `Could not interpret that: ${e.message}` }); }
         return json(res, 200, { prefs: sess.prefs });
