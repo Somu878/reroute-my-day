@@ -8,7 +8,9 @@ export function createAi(env = process.env, fetchImpl = globalThis.fetch) {
   const enabled = !!env.AI_API_KEY;
   const base = (env.AI_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
   // AI_MODEL may be a comma-separated list; models are tried in order if one is rate-limited or fails.
-  const models = (env.AI_MODEL || 'nvidia/nemotron-3.5-super-vl:free,recursive/flint-v1.0:free,baidu/ernie-5.5-flash-preview:free').split(',').map((s) => s.trim()).filter(Boolean);
+  const models = (env.AI_MODEL || 'nvidia/nemotron-3.5-super-vl:free,recursive/flint-v1.0:free,baidu/ernie-5.5-flash-preview:free').split(',').map((s) => s.trim()).filter(Boolean)
+    // Hard free-only guard: OpenRouter ':free' variants are never billed. Anything else is dropped unless ALLOW_PAID_MODELS=1.
+    .filter((m) => env.ALLOW_PAID_MODELS === '1' || m.endsWith(':free'));
   const model = models[0];
 
   async function chat(system, user) {
