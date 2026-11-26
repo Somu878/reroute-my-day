@@ -62,9 +62,17 @@ function render() {
 
 function renderPanel() {
   const p = state.plan, banner = $('#banner'), panel = $('#proposal'); panel.innerHTML = '';
-  if (!p || (!p.conflicts.length)) { banner.innerHTML = '<div class="ok">✓ Your plan is intact. Nothing needs rerouting.</div>'; return; }
+  if (!p || (!p.conflicts.length)) {
+    const done = state.lastApplied ? `<div class="ok">✓ Clash resolved. Moved ${state.lastApplied} block${state.lastApplied > 1 ? 's' : ''}, 0 meetings touched.</div>` : '<div class="ok">✓ Your plan is intact. Nothing needs rerouting.</div>';
+    banner.innerHTML = done + '<div class="pitch"><h2>Your day, repaired in one click</h2><p>When a meeting lands on your focus time, Reroute moves only your flexible blocks, explains why, and never touches other people\'s meetings. Nothing changes until you press Apply.</p>' + (state.mode === 'demo' ? '<button class="primary big" id="cta">See it in action</button>' : '') + '</div>';
+    const cta = $('#cta'); if (cta) cta.onclick = () => $('#disrupt').click();
+    return;
+  }
   const n = p.conflicts.length;
   banner.innerHTML = `<div class="warn">Your day changed. ${n} personal block${n > 1 ? 's' : ''} now clash${n > 1 ? '' : 'es'} with a meeting.</div>`;
+  const nm = p.moves.length;
+  if (nm) { const o = document.createElement('div'); o.className = 'outcome'; o.textContent = `Applying would resolve ${nm} clash${nm > 1 ? 'es' : ''} and move 0 meetings.`; panel.append(o); }
+  const role = document.createElement('div'); role.className = 'role'; role.innerHTML = '<b>Who decides what:</b> rules decide which moves are allowed. AI only ranks the options and explains the choice.'; panel.append(role);
   if (p.ai?.status === 'ok' && p.ai.explanation) { const x = document.createElement('div'); x.className = 'ai'; x.innerHTML = '<span class="tag">AI-generated explanation</span><p></p>'; x.querySelector('p').textContent = p.ai.explanation; panel.append(x); }
   if (p.ai?.status === 'error') { const x = document.createElement('div'); x.className = 'ai err'; x.textContent = p.ai.error; panel.append(x); }
   for (const m of p.moves) {
@@ -80,7 +88,7 @@ function renderPanel() {
     const a = document.createElement('div'); a.className = 'actions';
     a.innerHTML = `<button class="primary" id="apply">Apply ${p.moves.length} change${p.moves.length > 1 ? 's' : ''}</button><button class="ghost" id="dismiss">Dismiss</button>`;
     panel.append(a);
-    $('#apply').onclick = async () => { try { const r = await post('/api/reroute/apply', { moves: p.moves, planHash: p.planHash }); await load(); toast(`Moved ${r.applied} block${r.applied > 1 ? 's' : ''}. Meetings untouched.`, true); } catch (e) { toast(e.message); load(); } };
+    $('#apply').onclick = async () => { try { const r = await post('/api/reroute/apply', { moves: p.moves, planHash: p.planHash }); await load(); state.lastApplied = r.applied; render(); toast(`Moved ${r.applied} block${r.applied > 1 ? 's' : ''}. Meetings untouched.`, true); } catch (e) { toast(e.message); load(); } };
     $('#dismiss').onclick = () => { state.plan = { ...state.plan, moves: [] }; render(); };
   }
 }
@@ -88,18 +96,19 @@ function renderPanel() {
 async function load() {
   csrf = (await api('/api/mode')).csrf;
   const [cfg, ev, plan] = await Promise.all([api('/api/mode'), api('/api/events'), api('/api/reroute/plan')]);
-  state = { cfg, mode: ev.mode, events: ev.events, plan };
+  state = { cfg, mode: ev.mode, events: ev.events, plan, lastApplied: state && plan.conflicts.length === 0 ? state.lastApplied : 0 };
   $('#mode').textContent = ev.mode === 'demo' ? 'Demo mode (sample data)' : 'Google Calendar (live)';
   $('#demoTools').style.display = ev.mode === 'demo' ? 'flex' : 'none';
   $('#connect').style.display = ev.mode === 'demo' && cfg.googleAvailable ? '' : 'none';
   $('#ai').textContent = cfg.aiEnabled ? 'AI: on (explains and ranks; rules decide what is allowed)' : 'AI: off (rules only, no API key)';
-  $('#prefs').style.display = cfg.aiEnabled ? 'flex' : 'none';
+  $('#prefs').style.display = cfg.aiEnabled ? 'flex' : 'none'; $('#prefEx').style.display = cfg.aiEnabled ? 'flex' : 'none'; $('#reviewer').style.display = ev.mode === 'demo' ? '' : 'none';
   if (cfg.aiEnabled && plan.ai?.prefsText) $('#prefsText').placeholder = 'Active: ' + plan.ai.prefsText;
   render();
 }
+document.querySelectorAll('#prefEx button').forEach(b => b.onclick = () => { $('#prefsText').value = b.textContent; $('#prefsText').focus(); });
 $('#prefsGo').onclick = async () => { try { await post('/api/ai/prefs', { text: $('#prefsText').value }); load(); } catch (e) { toast(e.message); } };
 $('#disrupt').onclick = async () => { try { await post('/api/demo/disrupt'); load(); } catch (e) { toast(e.message); } };
-$('#reset').onclick = async () => { await post('/api/demo/reset'); load(); };
+$('#reset').onclick = async () => { await post('/api/demo/reset'); if (state) state.lastApplied = 0; load(); };
 $('#connect').onclick = () => (location.href = '/auth/google');
 (async () => {
   try {
