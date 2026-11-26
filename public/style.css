@@ -42,3 +42,9 @@ aside{width:340px;border-left:1px solid var(--line);padding:16px;overflow:auto}
 .ai{margin-top:12px;padding:10px;border-radius:8px;background:#f3e8fd;font-size:13px}.ai .tag{font-size:11px;font-weight:600;color:#7627bb}.ai p{margin:4px 0 0}.ai.err{background:#fff8e1}
 #prefs{display:flex;gap:6px;margin:12px 0}#prefs input{flex:1;padding:7px;border:1px solid var(--line);border-radius:6px;font:inherit}
 .ev{z-index:2}.ev.allday{z-index:0;opacity:.7}.ev.ghost{z-index:3}
+
+.pitch{margin-top:14px}.pitch h2{margin:0 0 6px;font-size:18px;font-weight:500}.pitch p{margin:0 0 12px;color:var(--mut)}
+button.big{padding:11px 20px;font-size:15px}
+.outcome{margin-top:12px;font-weight:500;color:#0d652d}.role{margin-top:10px;font-size:12px;color:var(--mut);background:#f1f3f4;padding:8px 10px;border-radius:8px}
+#prefEx{flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--mut);margin:-6px 0 8px}button.chip{padding:3px 9px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:12px;color:var(--txt)}
+.note{margin-top:18px;font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
